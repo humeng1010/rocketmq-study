@@ -24,15 +24,7 @@ public class SeckillController {
 
     @GetMapping("/seckill")
     public String doSeckill(Integer id, Integer userId) {
-        SetOperations<String, String> set = stringRedisTemplate.opsForSet();
-        String time = DateTimeFormatter.ofPattern("yyyy:MM:dd:").format(LocalDateTime.now());
-        String key = "seckill:" + time + id;
-        if (Boolean.TRUE.equals(set.isMember(key, userId.toString()))) {
-            //    该用户已经抢过该商品了
-            return "不能重复下单";
-        }
-        // 缓存用户到商品中,一人一单
-        set.add(key, userId.toString());
+
         // 扣减缓存库存
         String key2 = "seckill:stock:" + id;
         ValueOperations<String, String> value = stringRedisTemplate.opsForValue();
@@ -42,6 +34,18 @@ public class SeckillController {
         if (stock == null || stock < 0) {
             return "该商品已售罄";
         }
+
+        
+        SetOperations<String, String> set = stringRedisTemplate.opsForSet();
+        String time = DateTimeFormatter.ofPattern("yyyy:MM:dd:").format(LocalDateTime.now());
+        String key = "seckill:" + time + id;
+        if (Boolean.TRUE.equals(set.isMember(key, userId.toString()))) {
+            //    该用户已经抢过该商品了
+            return "不能重复下单";
+        }
+        // 缓存用户到商品中,一人一单
+        set.add(key, userId.toString());
+
 
         //    发送MQ异步处理
         rocketMQTemplate.asyncSend("seckillTopic", id + "-" + userId, new SendCallback() {
